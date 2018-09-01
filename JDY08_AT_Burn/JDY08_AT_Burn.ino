@@ -110,14 +110,18 @@ void setup()
 	digitalWrite(S1_LED, 0);
 	digitalWrite(S2_LED, 0);
 	digitalWrite(S3_LED, 0);
-	Serial.setTimeout(150);
+	Serial.setTimeout(250);
 }
 
 // Add the main program code into the continuous loop() function
 void loop()
 {
+	char str_null[50];
 	if (0 == digitalRead(Button_pin))
 	{
+		Serial1.begin(BAUD_RATE);
+		Serial2.begin(BAUD_RATE);
+		Serial3.begin(BAUD_RATE);
 		digitalWrite(Button_LED, 0);
 		digitalWrite(S1_LED, 0);
 		digitalWrite(S2_LED, 0);
@@ -130,6 +134,7 @@ void loop()
 			write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
 			digitalWrite(S1_LED, 1);
 		}
+		Serial1.readBytes(str_null, 50);
 		if (S2_Burn(Minor_hex))
 		{
 			Minor_hex++;
@@ -137,6 +142,7 @@ void loop()
 			write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
 			digitalWrite(S2_LED, 1);
 		}
+		Serial2.readBytes(str_null, 50);
 		if (S3_Burn(Minor_hex))
 		{
 			Minor_hex++;
@@ -144,6 +150,7 @@ void loop()
 			write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
 			digitalWrite(S3_LED, 1);
 		}
+		Serial3.readBytes(str_null, 50);
 		while (!digitalRead(Button_pin))
 			;
 		digitalWrite(Button_LED, 1);
@@ -294,13 +301,15 @@ bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.1 Mode OK!");
 	}
-
+	delay(100);
 	Serial1.write("AT+RST");
 	delay(200);	//经测试不能改小
 
 	memset(str_Serial, NULL, 50);
-	Serial1.write("AT+STRUUID");
-	Serial1.write(UUID,32);
+	memcpy(str_Serial, "AT+STRUUID",10);
+	strcat(str_Serial, UUID);
+	Serial1.write(str_Serial, 42);
+	delay(20);
 	Serial1.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
@@ -313,10 +322,12 @@ bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.1 STRUUID OK!");
 	}
-
+	delay(200);
 	memset(str_Serial, NULL, 50);
-	Serial1.write("AT+MAJOR");
-	Serial1.write(Major,4);
+	memcpy(str_Serial, "AT+MAJOR", 8);
+	strcat(str_Serial, Major);
+	Serial1.write(str_Serial, 12);
+	delay(20);
 	Serial1.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
@@ -332,8 +343,9 @@ bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
 
 	delay(300);
 	memset(str_Serial, NULL, 50);
-	Serial1.write("AT+MINOR");
-	Serial1.write(Minor,4);
+	memcpy(str_Serial, "AT+MINOR", 8);
+	strcat(str_Serial, Minor);
+	Serial1.write(str_Serial,12);
 	delay(20);
 	Serial1.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
@@ -359,6 +371,7 @@ bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
 	char str_Serial[50];
 	memset(str_Serial, NULL, 50);
 	Serial2.write("AT+HOSTEN3");
+	delay(20);
 	Serial2.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
@@ -371,13 +384,15 @@ bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.2 Mode OK!");
 	}
-
+	delay(100);
 	Serial1.write("AT+RST");
 	delay(200);	//经测试不能改小
 
-	memset(str_Serial, NULL, 50);
-	Serial2.write("AT+STRUUID");
-	Serial2.write(UUID, 32);
+	memset(str_Serial, NULL, 50); 
+	memcpy(str_Serial, "AT+STRUUID", 10);
+	strcat(str_Serial, UUID);
+	Serial2.write(str_Serial, 42);
+	delay(20);
 	Serial2.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
@@ -390,10 +405,12 @@ bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.2 STRUUID OK!");
 	}
-
+	delay(200);
 	memset(str_Serial, NULL, 50);
-	Serial2.write("AT+MAJOR");
-	Serial2.write(Major, 4);
+	memcpy(str_Serial, "AT+MAJOR", 8);
+	strcat(str_Serial, Major);
+	Serial2.write(str_Serial, 12);
+	delay(20);
 	Serial2.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
@@ -409,8 +426,9 @@ bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
 
 	delay(300);
 	memset(str_Serial, NULL, 50);
-	Serial2.write("AT+MINOR");
-	Serial2.write(Minor, 4);
+	memcpy(str_Serial, "AT+MINOR", 8);
+	strcat(str_Serial, Minor);
+	Serial2.write(str_Serial, 12);
 	delay(20);
 	Serial2.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
@@ -434,6 +452,7 @@ bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
 	char str_Serial[50];
 	memset(str_Serial, NULL, 50);
 	Serial3.write("AT+HOSTEN3");
+	delay(20);
 	Serial3.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
@@ -451,8 +470,10 @@ bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
 	delay(200);	//经测试不能改小
 
 	memset(str_Serial, NULL, 50);
-	Serial3.write("AT+STRUUID");
-	Serial3.write(UUID, 32);
+	memcpy(str_Serial, "AT+STRUUID", 10);
+	strcat(str_Serial, UUID);
+	Serial3.write(str_Serial, 42);
+	delay(20);
 	Serial3.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
@@ -465,10 +486,12 @@ bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.3 STRUUID OK!");
 	}
-
+	delay(200);
 	memset(str_Serial, NULL, 50);
-	Serial3.write("AT+MAJOR");
-	Serial3.write(Major, 4);
+	memcpy(str_Serial, "AT+MAJOR", 8);
+	strcat(str_Serial, Major);
+	Serial3.write(str_Serial, 12);
+	delay(20);
 	Serial3.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
@@ -484,8 +507,9 @@ bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
 
 	delay(300);
 	memset(str_Serial, NULL, 50);
-	Serial3.write("AT+MINOR");
-	Serial3.write(Minor, 4);
+	memcpy(str_Serial, "AT+MINOR", 8);
+	strcat(str_Serial, Minor);
+	Serial3.write(str_Serial, 12);
 	delay(20);
 	Serial3.readBytesUntil('\n', str_Serial, 10);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
