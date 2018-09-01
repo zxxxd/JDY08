@@ -21,7 +21,7 @@
 
 char UUID[33] = "FDA50693A4E24FB1AFCFC6EB07647825";		//必须为字符串
 char Major[5] = "27CA";
-char Minor[5] = "";
+char Minor[5] = "12AF";
 uint16_t Minor_hex;
 
 
@@ -39,6 +39,11 @@ void write_EEPROM_data(char *UUID_Rom, char *Major_Rom, char *Minor_Rom);
 uint16_t StrToHex(char *str_read);
 //将整数转为ACSII字符串
 void HexToStr(uint16_t number, char *str_out);
+//NO.1 烧录
+bool S1_Burn(uint16_t num);		//返回1为成功，0为失败
+//bool S2_Burn(uint16_t num);		//返回1为成功，0为失败
+//bool S3_Burn(uint16_t num);		//返回1为成功，0为失败
+
 
 // The setup() function runs once each time the micro-controller starts
 void setup()
@@ -71,7 +76,7 @@ void setup()
 
 	delay(100);
 	Serial.print("Start system! Read the EEPROM.\n");
-	//write_EEPROM_data(UUID, Major, Minor);
+	//write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
 	read_EEPROM_data(UUID_Rom, Major_Rom, Minor_Rom);
 	Serial.print("UUID_ROM = ");
 	Serial.print(UUID_Rom);
@@ -100,20 +105,57 @@ void setup()
 		Minor_hex = StrToHex(Minor_Rom);		//把输入的字符串转为16进制存储
 	}
 	Serial.println("The parameter settings are complete. Ready to burn.");
+	HexToStr(Minor_hex, Minor);
+	write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
 	digitalWrite(S1_LED, 0);
 	digitalWrite(S2_LED, 0);
 	digitalWrite(S3_LED, 0);
-	Serial.setTimeout(50);
+	Serial.setTimeout(150);
 }
 
 // Add the main program code into the continuous loop() function
 void loop()
 {
-	if (1 == digitalRead(Button_pin))
+	if (0 == digitalRead(Button_pin))
 	{
+		digitalWrite(Button_LED, 0);
+		digitalWrite(S1_LED, 0);
+		digitalWrite(S2_LED, 0);
+		digitalWrite(S3_LED, 0);
 		Serial.println("Start burning!");
+		if (S1_Burn(Minor_hex))
+		{
+			Minor_hex++;
+			HexToStr(Minor_hex, Minor);
+			write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
+			digitalWrite(S1_LED, 1);
+		}
+		if (S2_Burn(Minor_hex))
+		{
+			Minor_hex++;
+			HexToStr(Minor_hex, Minor);
+			write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
+			digitalWrite(S2_LED, 1);
+		}
+		if (S3_Burn(Minor_hex))
+		{
+			Minor_hex++;
+			HexToStr(Minor_hex, Minor);
+			write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
+			digitalWrite(S3_LED, 1);
+		}
+		while (!digitalRead(Button_pin))
+			;
+		digitalWrite(Button_LED, 1);
+	}
 
-		Serial.print("");
+
+	if (Serial.available()) {      // If anything comes in Serial (USB),
+		Serial1.write(Serial.read());   // read it and send it out Serial1 (pins 0 & 1)
+	}
+
+	if (Serial1.available()) {     // If anything comes in Serial1 (pins 0 & 1)
+		Serial.write(Serial1.read());   // read it and send it out Serial (USB)
 	}
 	//HexToStr(Minor_hex, Minor);
 }
@@ -234,14 +276,231 @@ void HexToStr(uint16_t number, char *str_out)
 
 
 */
-bool S1_Burn(uint16_t num)
+
+bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
 {
-	char minor_Serial[5];
 	char str_Serial[50];
 	memset(str_Serial, NULL, 50);
-	HexToStr(num, minor_Serial);
 	Serial1.write("AT+HOSTEN3");
-	Serial1.readBytesUntil()
+	Serial1.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.1 Mode ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println(" ");
+		return 0;
+	}
+	else
+	{
+		Serial.println("NO.1 Mode OK!");
+	}
 
+	Serial1.write("AT+RST");
+	delay(200);	//经测试不能改小
+
+	memset(str_Serial, NULL, 50);
+	Serial1.write("AT+STRUUID");
+	Serial1.write(UUID,32);
+	Serial1.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.1 STRUUID ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println(" ");
+		return 0;
+	}
+	else
+	{
+		Serial.println("NO.1 STRUUID OK!");
+	}
+
+	memset(str_Serial, NULL, 50);
+	Serial1.write("AT+MAJOR");
+	Serial1.write(Major,4);
+	Serial1.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.1 Major ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println();
+		return 0;
+	}
+	else
+	{
+		Serial.println("NO.1 Major OK!");
+	}
+
+	delay(300);
+	memset(str_Serial, NULL, 50);
+	Serial1.write("AT+MINOR");
+	Serial1.write(Minor,4);
+	delay(20);
+	Serial1.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.1 Minor ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println();
+		return 0;
+	}
+	else
+	{
+		Serial.print("NO.1 Minor is:");
+		Serial.write(Minor, 4);
+		Serial.println(" ");
+	}
+	return 1;
+}
+
+
+
+bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
+{
+	char str_Serial[50];
+	memset(str_Serial, NULL, 50);
+	Serial2.write("AT+HOSTEN3");
+	Serial2.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.2 Mode ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println();
+		return 0;
+	}
+	else
+	{
+		Serial.println("NO.2 Mode OK!");
+	}
+
+	Serial1.write("AT+RST");
+	delay(200);	//经测试不能改小
+
+	memset(str_Serial, NULL, 50);
+	Serial2.write("AT+STRUUID");
+	Serial2.write(UUID, 32);
+	Serial2.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.2 STRUUID ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println();
+		return 0;
+	}
+	else
+	{
+		Serial.println("NO.2 STRUUID OK!");
+	}
+
+	memset(str_Serial, NULL, 50);
+	Serial2.write("AT+MAJOR");
+	Serial2.write(Major, 4);
+	Serial2.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.2 Major ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println();
+		return 0;
+	}
+	else
+	{
+		Serial.println("NO.2 Major OK!");
+	}
+
+	delay(300);
+	memset(str_Serial, NULL, 50);
+	Serial2.write("AT+MINOR");
+	Serial2.write(Minor, 4);
+	delay(20);
+	Serial2.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.2 Minor ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println();
+		return 0;
+	}
+	else
+	{
+		Serial.print("NO.2 Minor is:");
+		Serial.write(Minor, 4);
+		Serial.println(" ");
+	}
+	return 1;
+}
+
+bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
+{
+	char str_Serial[50];
+	memset(str_Serial, NULL, 50);
+	Serial3.write("AT+HOSTEN3");
+	Serial3.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.3 Mode ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println();
+		return 0;
+	}
+	else
+	{
+		Serial.println("NO.3 Mode OK!");
+	}
+
+	Serial1.write("AT+RST");
+	delay(200);	//经测试不能改小
+
+	memset(str_Serial, NULL, 50);
+	Serial3.write("AT+STRUUID");
+	Serial3.write(UUID, 32);
+	Serial3.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.3 STRUUID ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println();
+		return 0;
+	}
+	else
+	{
+		Serial.println("NO.3 STRUUID OK!");
+	}
+
+	memset(str_Serial, NULL, 50);
+	Serial3.write("AT+MAJOR");
+	Serial3.write(Major, 4);
+	Serial3.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.3 Major ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println();
+		return 0;
+	}
+	else
+	{
+		Serial.println("NO.3 Major OK!");
+	}
+
+	delay(300);
+	memset(str_Serial, NULL, 50);
+	Serial3.write("AT+MINOR");
+	Serial3.write(Minor, 4);
+	delay(20);
+	Serial3.readBytesUntil('\n', str_Serial, 10);
+	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	{
+		Serial.println("NO.3 Minor ERROR!!!");
+		Serial.write(str_Serial);
+		Serial.println();
+		return 0;
+	}
+	else
+	{
+		Serial.print("NO.3 Minor is:");
+		Serial.write(Minor, 4);
+		Serial.println(" ");
+	}
+	return 1;
 }
 
