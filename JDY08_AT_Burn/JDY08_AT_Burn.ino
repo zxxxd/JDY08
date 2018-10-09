@@ -12,33 +12,49 @@
 #include <EEPROM.h>
 
 #define BAUD_RATE 115200	//波特率
-#define SERIAL_WAIT_TIME 40000		//串口输入等待时间
+#define SERIAL_WAIT_TIME 40000		//串口输入等待时间,40秒
 #define Button_pin 9
 #define S1_LED 4
 #define S2_LED 3
 #define S3_LED 2
 #define Button_LED 8
 
-char UUID[33] = "FDA50693A4E24FB1AFCFC6EB07647825";		//必须为字符串
-char Major[5] = "27CA";
-char Minor[5] = "12AF";
-uint16_t Minor_hex;
+/*
+	如果需要更改预设参数，请把 FIRST_USE 置1。烧录后记得运行一次，然后置0并再烧录。
+	下面的参数为预设参数，仅在 FIRST_USE 置1时起作用。
+	注意：Major和Minor的最大值为65532。
+ */
+#define FIRST_USE 1
+char UUID[33] = "FDA50693A4E24FB1AFCFC6EB07647825";		//必须为字符串，十六进制
+uint16_t Major_hex = 10186;									//十进制
+uint16_t Minor_hex = 60;									//十进制
+uint32_t Dev_ID = 21583497;		//系统ID, 十进制
+uint32_t Dev_Code = 49;			//设备编号，十进制
+char Major[5];					//字符串，代表uint16_t的十六进制
+char Minor[5];
 
 
 /*
 	用EEPROM存储上次的配置参数
-	地址0-31：由高位到低位存储UUID
-	地址32-35：由高位到低位存储Major
-	地址36-39：由高位到低位存储Minor
+	地址0-31：由高位到低位存储 char UUID[33]
+	地址32-33：由高位到低位存储 uint16_t Major
+	地址34-35：由高位到低位存储 uint16_t Minor
+	地址36-39：由高位到低位存储 uint32_t Dev_ID
+	地址40-43：由高位到低位存储 uint32_t Dev_Code
 */
 const uint16_t EEPROM_address = 0;	//EEPROM的初始地址
 
-void read_EEPROM_data(char *UUID_Rom, char *Major_Rom, char *Minor_Rom);
-void write_EEPROM_data(char *UUID_Rom, char *Major_Rom, char *Minor_Rom);
+void read_EEPROM_data(char *UUID_Rom);
+void write_EEPROM_data(char *UUID_Rom, uint32_t dev_id, uint32_t dev_code);
 //将十六进制的ACSII字符串转换成整数
-uint16_t StrToHex(char *str_read);
-//将整数转为ACSII字符串
+uint16_t StrToHex(char *str_read, int len = 4);
+//将十进制的ACSII字符串转换成整数
+uint32_t StrToDEC(char *str_read, int len);
+//将整数转为ACSII字符串，字符串为16进制
 void HexToStr(uint16_t number, char *str_out);
+//清空串口的buffer
+void clear_Serial_buffer(uint8_t port = 0);
+
 //NO.1 烧录
 bool S1_Burn(uint16_t num);		//返回1为成功，0为失败
 //bool S2_Burn(uint16_t num);		//返回1为成功，0为失败
@@ -48,10 +64,11 @@ bool S1_Burn(uint16_t num);		//返回1为成功，0为失败
 // The setup() function runs once each time the micro-controller starts
 void setup()
 {
-	char UUID_Rom[33] = "01234567890123456789012345678901";
-	char Major_Rom[5] = "0123";
-	char Minor_Rom[5] = "0123";
-	char string_read[10];
+	//下面的初始化无意义
+	char UUID_Rom[33] = "01234567890123456789012345678901";	//UUID
+	char Major_Rom[5] = "0123";								//Major
+	char Minor_Rom[5] = "0123";								//Minor
+	char string_read[10];									//临时存储
 
 	//硬件初始化
 	Serial.begin(BAUD_RATE);
@@ -74,39 +91,114 @@ void setup()
 		; // wait for serial port to connect. Needed for native USB
 	}
 
+#if FIRST_USE
+	write_EEPROM_data(UUID, Dev_ID, Dev_Code);		//向EEPROM写入参数
+#endif
+
 	delay(100);
 	Serial.print("Start system! Read the EEPROM.\n");
-	//write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
-	read_EEPROM_data(UUID_Rom, Major_Rom, Minor_Rom);
-	Serial.print("UUID_ROM = ");
+	read_EEPROM_data(UUID_Rom);
+	Serial.print("UUID_ROM(HEX) = 0x");
 	Serial.print(UUID_Rom);
 	Serial.println();
-	Serial.print("Major_ROM = ");
-	Serial.print(Major_Rom);
+	Serial.print("Major_ROM(DEC) = ");
+	Serial.print(StrToDEC(Major_Rom,5), DEC);
 	Serial.println();
-	Serial.print("Minor_ROM = ");
-	Serial.print(Minor_Rom);
+	Serial.print("Minor_ROM(DEC) = ");
+	Serial.print(StrToDEC(Minor_Rom,5), DEC);
 	Serial.println();
+	Serial.print("Dev_ID(DEC) = ");
+	Serial.print(Dev_ID, DEC);
+	Serial.println();
+	Serial.print("Dev_Code(DEC) = ");
+	Serial.print(Dev_Code, DEC);
+	Serial.println();
+
+	/*
+	 * 下面的代码是用于用户更改参数的操作流程
+	 * 1. 检查相应参数是否正确。正确则输入“Y”或“y”，错误就输入“N”或“n”，然后点击“发送”。注意不要输入回车。
+	 * 2. 若参数错误，则输入正确的参数并点击发送。不要输入回车。
+	 * 3. 对于不能更改的参数，请在第26行把 FIRST_USE 置1，并更改下面的参数为正确的值，烧录并运行。
+		  完成后把 FIRST_USE 置0.
+	 * 4. 输入的参数，请用0补全高位,，例如参数10，需要输入为00010
+	 */
+
+	//更改 Major 参数
+	clear_Serial_buffer();
+	Serial.println("Is Major data Right(Y/N)?");
+	Serial.readBytes(string_read, 1);
+	if ('N' == string_read[0] || 'n' == string_read[0])
+	{
+		memset(string_read, NULL, 10);
+		Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
+		Serial.println("Enter the new Major. The Max is 65532.");
+		Major_hex = Serial.read();
+		Serial.print("New Major is: ");
+		Serial.println(Major_hex, DEC);
+	}
+	else
+	{
+		;
+	}
+	clear_Serial_buffer();
+
+	//更改 Minor 参数
 	Serial.println("Is Minor data Right(Y/N)?");
 	Serial.readBytes(string_read, 1);
 	if ('N' == string_read[0] || 'n' == string_read[0])
 	{
-		memset(string_read, NULL, 33);
-		Serial.println("Enter the new Minor in hex. Do not enter '0x'! ");
-		Serial.readBytes(string_read, 1);
-		Serial.setTimeout(100);
-		Serial.readBytes(string_read+1, 3);
-		Minor_hex = StrToHex(string_read);		//把输入的字符串转为16进制存储
+		memset(string_read, NULL, 10);
+		Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
+		Serial.println("Enter the new Minor. The Max is 65532.");
+		Minor_hex = Serial.read();
 		Serial.print("New Minor is: ");
-		Serial.println(Minor_hex, HEX);
+		Serial.println(Minor_hex, DEC);
 	}
 	else
 	{
-		Minor_hex = StrToHex(Minor_Rom);		//把输入的字符串转为16进制存储
+		;
 	}
+	clear_Serial_buffer();
+
+	//更改 Dev_ID 参数
+	Serial.println("Is Dev_ID data Right(Y/N)?");
+	Serial.readBytes(string_read, 1);
+	if ('N' == string_read[0] || 'n' == string_read[0])
+	{
+		memset(string_read, NULL, 10);
+		Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
+		Serial.println("Enter the new Dev_ID.");
+		Dev_ID = Serial.read();
+		Serial.print("New Dev_ID is: ");
+		Serial.println(Dev_ID, DEC);
+	}
+	else
+	{
+		;
+	}
+	clear_Serial_buffer();
+
+	//更改 Dev_Code 参数
+	Serial.println("Is Dev_Code data Right(Y/N)?");
+	Serial.readBytes(string_read, 1);
+	if ('N' == string_read[0] || 'n' == string_read[0])
+	{
+		memset(string_read, NULL, 10);
+		Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
+		Serial.println("Enter the new Dev_Code.");
+		Dev_Code = Serial.read();
+		Serial.print("New Dev_Code is: ");
+		Serial.println(Dev_Code, DEC);
+	}
+	else
+	{
+		;
+	}
+	clear_Serial_buffer();
+
+
 	Serial.println("The parameter settings are complete. Ready to burn.");
-	HexToStr(Minor_hex, Minor);
-	write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
+	write_EEPROM_data(UUID, Dev_ID, Dev_Code);		//向EEPROM写入参数
 	digitalWrite(S1_LED, 0);
 	digitalWrite(S2_LED, 0);
 	digitalWrite(S3_LED, 0);
@@ -129,25 +221,38 @@ void loop()
 		Serial.println("Start burning!");
 		if (S1_Burn(Minor_hex))
 		{
+			Serial.print("Dev_ID = ");
+			Serial.print(Dev_ID, DEC);
+			Serial.println();
+			Dev_ID++;
+			Dev_Code++;
 			Minor_hex++;
 			HexToStr(Minor_hex, Minor);
-			write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
+			write_EEPROM_data(UUID, Dev_ID, Dev_Code);		//向EEPROM写入参数
 			digitalWrite(S1_LED, 1);
 		}
 		Serial1.readBytes(str_null, 50);
 		if (S2_Burn(Minor_hex))
 		{
+			Serial.print("Dev_ID = ");
+			Serial.print(Dev_ID);
+			Serial.println();
+			Dev_ID++;
 			Minor_hex++;
 			HexToStr(Minor_hex, Minor);
-			write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
+			write_EEPROM_data(UUID, Dev_ID, Dev_Code);		//向EEPROM写入参数
 			digitalWrite(S2_LED, 1);
 		}
 		Serial2.readBytes(str_null, 50);
 		if (S3_Burn(Minor_hex))
 		{
+			Serial.print("Dev_ID = ");
+			Serial.print(Dev_ID);
+			Serial.println();
+			Dev_ID++;
 			Minor_hex++;
 			HexToStr(Minor_hex, Minor);
-			write_EEPROM_data(UUID, Major, Minor);		//向EEPROM写入参数
+			write_EEPROM_data(UUID, Dev_ID, Dev_Code);		//向EEPROM写入参数
 			digitalWrite(S3_LED, 1);
 		}
 		Serial3.readBytes(str_null, 50);
@@ -176,41 +281,94 @@ void loop()
 	输入：三个参数的字符串。会被指针给更改。
 	输出：无
 */
-void read_EEPROM_data(char *UUID_Rom, char *Major_Rom, char *Minor_Rom)
+void read_EEPROM_data(char *UUID_Rom)
 {
+	uint32_t buffer_u32 = 0;	//临时存储过程中产生的每个8位
 	for (int i = 0; i < 32; i++)
 	{
 		*(UUID_Rom + i) = EEPROM.read(EEPROM_address + i);
 	}
-	for (int i = 0; i < 4; i++)
-	{
-		*(Major_Rom + i) = EEPROM.read(EEPROM_address + i + 32);
-	}
-	for (int i = 0; i < 4; i++)
-	{
-		*(Minor_Rom + i) = EEPROM.read(EEPROM_address + i + 36);
-	}
+	//读取Major
+	Major_hex = Minor_hex = 0;
+	buffer_u32 = EEPROM.read(EEPROM_address + 32);	//读高位
+	Major_hex = (buffer_u32 << 8) & 0xff00;
+	buffer_u32 = EEPROM.read(EEPROM_address + 33);	//读低位
+	Major_hex = Major_hex + (buffer_u32 & 0xff);
+	//读取Minor
+	buffer_u32 = EEPROM.read(EEPROM_address + 34);
+	Minor_hex = (buffer_u32 << 8) & 0xff00;
+	buffer_u32 = EEPROM.read(EEPROM_address + 35);
+	Minor_hex = Minor_hex + (buffer_u32 & 0xff);
+
+	//读取Dev相关
+	Dev_ID = Dev_Code = 0;
+	buffer_u32 = EEPROM.read(EEPROM_address + 36);
+	Dev_ID = (buffer_u32 << 24) & 0xff000000;
+	buffer_u32 = EEPROM.read(EEPROM_address + 37);
+	Dev_ID = Dev_ID + ((buffer_u32 << 16) & 0xff0000);
+	buffer_u32 = EEPROM.read(EEPROM_address + 38);
+	Dev_ID = Dev_ID + ((buffer_u32 << 8) & 0xff00);
+	buffer_u32 = EEPROM.read(EEPROM_address + 39);
+	Dev_ID = Dev_ID + (buffer_u32 & 0xff);
+
+	buffer_u32 = EEPROM.read(EEPROM_address + 40);
+	Dev_Code = (buffer_u32 << 24) & 0xff000000;
+	buffer_u32 = EEPROM.read(EEPROM_address + 41);
+	Dev_Code = Dev_Code + ((buffer_u32 << 16) & 0xff0000);
+	buffer_u32 = EEPROM.read(EEPROM_address + 42);
+	Dev_Code = Dev_Code + ((buffer_u32 << 8) & 0xff00);
+	buffer_u32 = EEPROM.read(EEPROM_address + 43);
+	Dev_Code = Dev_Code + (buffer_u32 & 0xff);
 }
 
 /*
-	void write_EEPROM_data(char *UUID_Rom, char *Major_Rom, char *Minor_Rom)；
+	void write_EEPROM_data(char *UUID_Rom, uint32_t dev_id, uint32_t dev_code)
 	用于把参数写入EEPROM中。
 	输入：三个参数的字符串
 */
-void write_EEPROM_data(char *UUID_Rom, char *Major_Rom, char *Minor_Rom)
+void write_EEPROM_data(char *UUID_Rom, uint32_t dev_id, uint32_t dev_code)
 {
-	for (int i = 0; i < 32; i++)
+	uint8_t buffer_u8 = 0;	//临时存储过程中产生的每个8位
+	for (int i = 0; i < 32; i++)	//写入 UUID
 	{
 		EEPROM.write(EEPROM_address + i, *(UUID_Rom + i));
 	}
-	for (int i = 0; i < 4; i++)
-	{
-		EEPROM.write(EEPROM_address + i + 32, *(Major_Rom + i));
-	}
-	for (int i = 0; i < 4; i++)
-	{
-		EEPROM.write(EEPROM_address + i + 36, *(Minor_Rom + i));
-	}
+	
+	//Major_hex = Minor_hex = 0;
+	//由高位到低位写入 Major
+	buffer_u8 = (Major_hex & 0xff00) >> 8;
+	EEPROM.write(EEPROM_address + 32, buffer_u8);	//写高8位
+	buffer_u8 = Major_hex & 0xff;
+	EEPROM.write(EEPROM_address + 33, buffer_u8);	//写低8位
+
+	//由高位到低位写入 Minor
+	buffer_u8 = (Minor_hex & 0xff00) >> 8;
+	EEPROM.write(EEPROM_address + 32, buffer_u8);	//写高8位
+	buffer_u8 = Minor_hex & 0xff;
+	EEPROM.write(EEPROM_address + 33, buffer_u8);	//写低8位
+
+
+	//dev_id 分解
+	buffer_u8 = (dev_id >> 24) & 0xff;
+	EEPROM.write(EEPROM_address + 40, buffer_u8);
+	buffer_u8 = (dev_id >> 16) & 0xff;
+	EEPROM.write(EEPROM_address + 41, buffer_u8);
+	buffer_u8 = (dev_id >> 8) & 0xff;
+	EEPROM.write(EEPROM_address + 42, buffer_u8);
+	buffer_u8 = dev_id & 0xff;
+	EEPROM.write(EEPROM_address + 43, buffer_u8);
+
+	//dev_code 分解
+	buffer_u8 = (dev_code >> 24) & 0xff;
+	EEPROM.write(EEPROM_address + 44, buffer_u8);
+	buffer_u8 = (dev_code >> 16) & 0xff;
+	EEPROM.write(EEPROM_address + 45, buffer_u8);
+	buffer_u8 = (dev_code >> 8) & 0xff;
+	EEPROM.write(EEPROM_address + 46, buffer_u8);
+	buffer_u8 = dev_code & 0xff;
+	EEPROM.write(EEPROM_address + 47, buffer_u8);
+
+
 }
 
 //将大写转为小写
@@ -231,7 +389,7 @@ int tolower(int c)
 	输入：需要被转换的字符串
 	输出：对应的数字
 */
-uint16_t StrToHex(char *str_read)
+uint16_t StrToHex(char *str_read, int len = 4)
 {
 	uint8_t i = 0;
 	uint16_t n = 0;
@@ -247,7 +405,26 @@ uint16_t StrToHex(char *str_read)
 			n = 16 * n + (tolower(*(str_read + i)) - '0');
 		}
 	}
-	if (i != 4)
+	if (i != len)
+		return 0;
+	else
+		return n;
+}
+
+/*
+功能：将十进制的ACSII字符串转换成整数。
+输入：需要被转换的字符串，字符串长度
+输出：对应的数字
+*/
+uint32_t StrToDEC(char *str_read, int len)
+{
+	uint8_t i = 0;
+	uint32_t n = 0;
+	for (; (*(str_read + i) >= '0' && *(str_read + i) <= '9') ; ++i)
+	{
+		n = 10 * n + (tolower(*(str_read + i)) - '0');
+	}
+	if (i != len)
 		return 0;
 	else
 		return n;
@@ -286,6 +463,7 @@ void HexToStr(uint16_t number, char *str_out)
 
 bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
 {
+	clear_Serial_buffer(1);
 	char str_Serial[50];
 	memset(str_Serial, NULL, 50);
 	Serial1.write("AT+HOSTEN3");
@@ -301,9 +479,10 @@ bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.1 Mode OK!");
 	}
-	delay(100);
+	clear_Serial_buffer(1);
 	Serial1.write("AT+RST");
 	delay(200);	//经测试不能改小
+	clear_Serial_buffer(1);
 
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+STRUUID",10);
@@ -322,6 +501,7 @@ bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.1 STRUUID OK!");
 	}
+	clear_Serial_buffer(1);
 	delay(200);
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+MAJOR", 8);
@@ -340,6 +520,7 @@ bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.1 Major OK!");
 	}
+	clear_Serial_buffer(1);
 
 	delay(300);
 	memset(str_Serial, NULL, 50);
@@ -361,6 +542,7 @@ bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
 		Serial.write(Minor, 4);
 		Serial.println(" ");
 	}
+	clear_Serial_buffer(1);
 	return 1;
 }
 
@@ -368,6 +550,7 @@ bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
 
 bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
 {
+	clear_Serial_buffer(2);
 	char str_Serial[50];
 	memset(str_Serial, NULL, 50);
 	Serial2.write("AT+HOSTEN3");
@@ -384,10 +567,11 @@ bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.2 Mode OK!");
 	}
+	clear_Serial_buffer(2);
 	delay(100);
 	Serial1.write("AT+RST");
 	delay(200);	//经测试不能改小
-
+	clear_Serial_buffer(2);
 	memset(str_Serial, NULL, 50); 
 	memcpy(str_Serial, "AT+STRUUID", 10);
 	strcat(str_Serial, UUID);
@@ -405,6 +589,7 @@ bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.2 STRUUID OK!");
 	}
+	clear_Serial_buffer(2);
 	delay(200);
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+MAJOR", 8);
@@ -423,7 +608,7 @@ bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.2 Major OK!");
 	}
-
+	clear_Serial_buffer(2);
 	delay(300);
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+MINOR", 8);
@@ -444,11 +629,13 @@ bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
 		Serial.write(Minor, 4);
 		Serial.println(" ");
 	}
+	clear_Serial_buffer(2);
 	return 1;
 }
 
 bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
 {
+	clear_Serial_buffer(3);
 	char str_Serial[50];
 	memset(str_Serial, NULL, 50);
 	Serial3.write("AT+HOSTEN3");
@@ -465,10 +652,10 @@ bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.3 Mode OK!");
 	}
-
+	clear_Serial_buffer(3);
 	Serial1.write("AT+RST");
 	delay(200);	//经测试不能改小
-
+	clear_Serial_buffer(3);
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+STRUUID", 10);
 	strcat(str_Serial, UUID);
@@ -486,6 +673,7 @@ bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.3 STRUUID OK!");
 	}
+	clear_Serial_buffer(3);
 	delay(200);
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+MAJOR", 8);
@@ -504,7 +692,7 @@ bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
 	{
 		Serial.println("NO.3 Major OK!");
 	}
-
+	clear_Serial_buffer(3);
 	delay(300);
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+MINOR", 8);
@@ -525,6 +713,29 @@ bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
 		Serial.write(Minor, 4);
 		Serial.println(" ");
 	}
+	clear_Serial_buffer(3);
 	return 1;
 }
 
+/* 函数名：void clear_Serial_buffer(uint8_t port = 0)
+ * 功能：清空串口的缓存区
+ * 参数：端口号。Serial 为 0，Serial1 为 1， 等等。默认为0.
+ * 返回值：无
+*/
+void clear_Serial_buffer(uint8_t port = 0)
+{
+	delay(200);
+	switch (port)
+	{
+	case 0:
+		Serial.readString();
+	case 1:
+		Serial1.readString();
+	case 2:
+		Serial2.readString();
+	case 3:
+		Serial3.readString();
+	default:
+		break;
+	}
+}
