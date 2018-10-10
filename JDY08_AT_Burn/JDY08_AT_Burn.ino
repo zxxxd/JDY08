@@ -24,7 +24,7 @@
 	下面的参数为预设参数，仅在 FIRST_USE 置1时起作用。
 	注意：Major和Minor的最大值为65532。
  */
-#define FIRST_USE 1
+#define FIRST_USE 0
 char UUID[33] = "FDA50693A4E24FB1AFCFC6EB07647825";		//必须为字符串，十六进制
 uint16_t Major_hex = 10186;									//十进制
 uint16_t Minor_hex = 60;									//十进制
@@ -56,20 +56,16 @@ void HexToStr(uint16_t number, char *str_out);
 void clear_Serial_buffer(uint8_t port = 0);
 
 //NO.1 烧录
-bool S1_Burn(uint16_t num);		//返回1为成功，0为失败
-//bool S2_Burn(uint16_t num);		//返回1为成功，0为失败
-//bool S3_Burn(uint16_t num);		//返回1为成功，0为失败
+int burn_AT_cmd(uint8_t port);	//返回1为成功，0为失败
 
 
-// The setup() function runs once each time the micro-controller starts
+
 void setup()
 {
 	//下面的初始化无意义
 	char UUID_Rom[33] = "01234567890123456789012345678901";	//UUID
-	char Major_Rom[5] = "0123";								//Major
-	char Minor_Rom[5] = "0123";								//Minor
 	char string_read[10];									//临时存储
-
+	int len;
 	//硬件初始化
 	Serial.begin(BAUD_RATE);
 	Serial.setTimeout(SERIAL_WAIT_TIME);
@@ -102,10 +98,10 @@ void setup()
 	Serial.print(UUID_Rom);
 	Serial.println();
 	Serial.print("Major_ROM(DEC) = ");
-	Serial.print(StrToDEC(Major_Rom,5), DEC);
+	Serial.print(Major_hex, DEC);
 	Serial.println();
 	Serial.print("Minor_ROM(DEC) = ");
-	Serial.print(StrToDEC(Minor_Rom,5), DEC);
+	Serial.print(Minor_hex, DEC);
 	Serial.println();
 	Serial.print("Dev_ID(DEC) = ");
 	Serial.print(Dev_ID, DEC);
@@ -125,22 +121,33 @@ void setup()
 
 	//更改 Major 参数
 	clear_Serial_buffer();
+	Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
 	Serial.println("Is Major data Right(Y/N)?");
 	Serial.readBytes(string_read, 1);
 	if ('N' == string_read[0] || 'n' == string_read[0])
 	{
 		memset(string_read, NULL, 10);
-		Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
+		
 		Serial.println("Enter the new Major. The Max is 65532.");
-		Major_hex = Serial.read();
+		while (!Serial.available())
+		{
+		}
+		delay(50);	//必须要，否则只能读出1
+		len = Serial.available();
+		Serial.readBytes(string_read, len);
+		Major_hex = StrToDEC(string_read, len);
+		Serial.println(string_read);
 		Serial.print("New Major is: ");
 		Serial.println(Major_hex, DEC);
+		memset(string_read, NULL, 10);
 	}
 	else
 	{
 		;
 	}
 	clear_Serial_buffer();
+	Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
+
 
 	//更改 Minor 参数
 	Serial.println("Is Minor data Right(Y/N)?");
@@ -148,17 +155,25 @@ void setup()
 	if ('N' == string_read[0] || 'n' == string_read[0])
 	{
 		memset(string_read, NULL, 10);
-		Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
 		Serial.println("Enter the new Minor. The Max is 65532.");
-		Minor_hex = Serial.read();
+		while (!Serial.available())
+		{
+		}
+		delay(50);	//必须要，否则只能读出1
+		len = Serial.available();
+		Serial.readBytes(string_read, len);
+		Minor_hex = StrToDEC(string_read, len);
 		Serial.print("New Minor is: ");
 		Serial.println(Minor_hex, DEC);
+		memset(string_read, NULL, 10);
 	}
 	else
 	{
 		;
 	}
 	clear_Serial_buffer();
+	Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
+
 
 	//更改 Dev_ID 参数
 	Serial.println("Is Dev_ID data Right(Y/N)?");
@@ -166,17 +181,25 @@ void setup()
 	if ('N' == string_read[0] || 'n' == string_read[0])
 	{
 		memset(string_read, NULL, 10);
-		Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
 		Serial.println("Enter the new Dev_ID.");
-		Dev_ID = Serial.read();
+		while (!Serial.available())
+		{
+		}
+		delay(50);	//必须要，否则只能读出1
+		len = Serial.available();
+		Serial.readBytes(string_read, len);
+		Dev_ID = StrToDEC(string_read, len);
 		Serial.print("New Dev_ID is: ");
 		Serial.println(Dev_ID, DEC);
+		memset(string_read, NULL, 10);
 	}
 	else
 	{
 		;
 	}
 	clear_Serial_buffer();
+	Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
+
 
 	//更改 Dev_Code 参数
 	Serial.println("Is Dev_Code data Right(Y/N)?");
@@ -184,25 +207,49 @@ void setup()
 	if ('N' == string_read[0] || 'n' == string_read[0])
 	{
 		memset(string_read, NULL, 10);
-		Serial.setTimeout(SERIAL_WAIT_TIME);	//设置串口等待数据的时间为40秒（SERIAL_WAIT_TIME）
 		Serial.println("Enter the new Dev_Code.");
-		Dev_Code = Serial.read();
+		while (!Serial.available())
+		{
+		}
+		delay(50);	//必须要，否则只能读出1
+		len = Serial.available();
+		Serial.readBytes(string_read, len);
+		Dev_Code = StrToDEC(string_read, len);
 		Serial.print("New Dev_Code is: ");
 		Serial.println(Dev_Code, DEC);
+		memset(string_read, NULL, 10);
 	}
 	else
 	{
 		;
 	}
 	clear_Serial_buffer();
-
-
+	
+	Serial.print("UUID_ROM(HEX) = 0x");
+	Serial.print(UUID_Rom);
+	Serial.println();
+	Serial.print("Major_ROM(DEC) = ");
+	Serial.print(Major_hex, DEC);
+	Serial.println();
+	Serial.print("Minor_ROM(DEC) = ");
+	Serial.print(Minor_hex, DEC);
+	Serial.println();
+	Serial.print("Dev_ID(DEC) = ");
+	Serial.print(Dev_ID, DEC);
+	Serial.println();
+	Serial.print("Dev_Code(DEC) = ");
+	Serial.print(Dev_Code, DEC);
+	Serial.println();
 	Serial.println("The parameter settings are complete. Ready to burn.");
 	write_EEPROM_data(UUID, Dev_ID, Dev_Code);		//向EEPROM写入参数
 	digitalWrite(S1_LED, 0);
 	digitalWrite(S2_LED, 0);
 	digitalWrite(S3_LED, 0);
-	Serial.setTimeout(250);
+	Serial.setTimeout(100);
+	Serial1.setTimeout(250);
+	Serial2.setTimeout(250);
+	Serial3.setTimeout(250);
+	HexToStr(Major_hex, Major);
 }
 
 // Add the main program code into the continuous loop() function
@@ -219,48 +266,41 @@ void loop()
 		digitalWrite(S2_LED, 0);
 		digitalWrite(S3_LED, 0);
 		Serial.println("Start burning!");
-		if (S1_Burn(Minor_hex))
+		for (uint8_t i = 1; i < 4; i++)
 		{
-			Serial.print("Dev_ID = ");
-			Serial.print(Dev_ID, DEC);
-			Serial.println();
-			Dev_ID++;
-			Dev_Code++;
-			Minor_hex++;
-			HexToStr(Minor_hex, Minor);
-			write_EEPROM_data(UUID, Dev_ID, Dev_Code);		//向EEPROM写入参数
-			digitalWrite(S1_LED, 1);
+			if (burn_AT_cmd(i))
+			{
+				Serial.print("Dev_ID = ");
+				Serial.print(Dev_ID, DEC);
+				Serial.print(",  Dev_Code = ");
+				Serial.print(Dev_Code, DEC);
+				Serial.println("\n");
+				Dev_ID++;
+				Dev_Code++;
+				Minor_hex++;
+				write_EEPROM_data(UUID, Dev_ID, Dev_Code);		//向EEPROM写入参数
+				switch (i)
+				{
+				case 1:
+					digitalWrite(S1_LED, 1);
+					break;
+				case 2:
+					digitalWrite(S2_LED, 1);
+					break;
+				case 3:
+					digitalWrite(S3_LED, 1);
+					break;
+				default:
+					break;
+				}
+			}
 		}
-		Serial1.readBytes(str_null, 50);
-		if (S2_Burn(Minor_hex))
-		{
-			Serial.print("Dev_ID = ");
-			Serial.print(Dev_ID);
-			Serial.println();
-			Dev_ID++;
-			Minor_hex++;
-			HexToStr(Minor_hex, Minor);
-			write_EEPROM_data(UUID, Dev_ID, Dev_Code);		//向EEPROM写入参数
-			digitalWrite(S2_LED, 1);
-		}
-		Serial2.readBytes(str_null, 50);
-		if (S3_Burn(Minor_hex))
-		{
-			Serial.print("Dev_ID = ");
-			Serial.print(Dev_ID);
-			Serial.println();
-			Dev_ID++;
-			Minor_hex++;
-			HexToStr(Minor_hex, Minor);
-			write_EEPROM_data(UUID, Dev_ID, Dev_Code);		//向EEPROM写入参数
-			digitalWrite(S3_LED, 1);
-		}
-		Serial3.readBytes(str_null, 50);
+		Serial.println("\n\n");
 		while (!digitalRead(Button_pin))
 			;
 		digitalWrite(Button_LED, 1);
 	}
-
+	
 
 	if (Serial.available()) {      // If anything comes in Serial (USB),
 		Serial1.write(Serial.read());   // read it and send it out Serial1 (pins 0 & 1)
@@ -269,7 +309,6 @@ void loop()
 	if (Serial1.available()) {     // If anything comes in Serial1 (pins 0 & 1)
 		Serial.write(Serial1.read());   // read it and send it out Serial (USB)
 	}
-	//HexToStr(Minor_hex, Minor);
 }
 
 
@@ -278,7 +317,7 @@ void loop()
 /*
 	void read_EEPROM_data(char *UUID_Rom, char *Major_Rom, char *Minor_Rom);
 	用于读取EEPROM中存储的参数。
-	输入：三个参数的字符串。会被指针给更改。
+	输入：一个参数的字符串。会被指针给更改。
 	输出：无
 */
 void read_EEPROM_data(char *UUID_Rom)
@@ -343,32 +382,30 @@ void write_EEPROM_data(char *UUID_Rom, uint32_t dev_id, uint32_t dev_code)
 
 	//由高位到低位写入 Minor
 	buffer_u8 = (Minor_hex & 0xff00) >> 8;
-	EEPROM.write(EEPROM_address + 32, buffer_u8);	//写高8位
+	EEPROM.write(EEPROM_address + 34, buffer_u8);	//写高8位
 	buffer_u8 = Minor_hex & 0xff;
-	EEPROM.write(EEPROM_address + 33, buffer_u8);	//写低8位
+	EEPROM.write(EEPROM_address + 35, buffer_u8);	//写低8位
 
 
 	//dev_id 分解
 	buffer_u8 = (dev_id >> 24) & 0xff;
-	EEPROM.write(EEPROM_address + 40, buffer_u8);
+	EEPROM.write(EEPROM_address + 36, buffer_u8);
 	buffer_u8 = (dev_id >> 16) & 0xff;
-	EEPROM.write(EEPROM_address + 41, buffer_u8);
+	EEPROM.write(EEPROM_address + 37, buffer_u8);
 	buffer_u8 = (dev_id >> 8) & 0xff;
-	EEPROM.write(EEPROM_address + 42, buffer_u8);
+	EEPROM.write(EEPROM_address + 38, buffer_u8);
 	buffer_u8 = dev_id & 0xff;
-	EEPROM.write(EEPROM_address + 43, buffer_u8);
+	EEPROM.write(EEPROM_address + 39, buffer_u8);
 
 	//dev_code 分解
 	buffer_u8 = (dev_code >> 24) & 0xff;
-	EEPROM.write(EEPROM_address + 44, buffer_u8);
+	EEPROM.write(EEPROM_address + 40, buffer_u8);
 	buffer_u8 = (dev_code >> 16) & 0xff;
-	EEPROM.write(EEPROM_address + 45, buffer_u8);
+	EEPROM.write(EEPROM_address + 41, buffer_u8);
 	buffer_u8 = (dev_code >> 8) & 0xff;
-	EEPROM.write(EEPROM_address + 46, buffer_u8);
+	EEPROM.write(EEPROM_address + 42, buffer_u8);
 	buffer_u8 = dev_code & 0xff;
-	EEPROM.write(EEPROM_address + 47, buffer_u8);
-
-
+	EEPROM.write(EEPROM_address + 43, buffer_u8);
 }
 
 //将大写转为小写
@@ -460,262 +497,198 @@ void HexToStr(uint16_t number, char *str_out)
 
 
 */
-
-bool S1_Burn(uint16_t num)	//返回1为成功，0为失败
+int burn_AT_cmd(uint8_t port)
 {
-	clear_Serial_buffer(1);
+	clear_Serial_buffer(port);
 	char str_Serial[50];
 	memset(str_Serial, NULL, 50);
-	Serial1.write("AT+HOSTEN3");
-	Serial1.readBytesUntil('\n', str_Serial, 10);
+	HexToStr(Minor_hex, Minor);
+
+	/*********  配置IBeacon模式  ***********/
+	switch (port)				
+	{
+	case 1:
+		Serial1.write("AT+HOSTEN3");
+		Serial1.readBytesUntil('\n', str_Serial, 10);
+		break;
+	case 2:
+		Serial2.write("AT+HOSTEN3");
+		Serial2.readBytesUntil('\n', str_Serial, 10);
+		break;
+	case 3:
+		Serial3.write("AT+HOSTEN3");
+		Serial3.readBytesUntil('\n', str_Serial, 10);
+		break;
+	default:
+		break;
+	}
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
-		Serial.println("NO.1 Mode ERROR!!!");
+		Serial.print("NO.");
+		Serial.print(port);
+		Serial.println(" Mode ERROR!!!");
 		Serial.write(str_Serial);
 		Serial.println(" ");
 		return 0;
 	}
 	else
 	{
-		Serial.println("NO.1 Mode OK!");
+		Serial.print("NO.");
+		Serial.print(port);
+		Serial.println(" Mode OK!");
 	}
-	clear_Serial_buffer(1);
-	Serial1.write("AT+RST");
-	delay(200);	//经测试不能改小
-	clear_Serial_buffer(1);
-
-	memset(str_Serial, NULL, 50);
-	memcpy(str_Serial, "AT+STRUUID",10);
-	strcat(str_Serial, UUID);
-	Serial1.write(str_Serial, 42);
-	delay(20);
-	Serial1.readBytesUntil('\n', str_Serial, 10);
-	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
+	//delay(50);
+	clear_Serial_buffer(port);
+	
+	/******  重启  *******/
+	switch (port)
 	{
-		Serial.println("NO.1 STRUUID ERROR!!!");
-		Serial.write(str_Serial);
-		Serial.println(" ");
-		return 0;
+	case 1:
+		Serial1.write("AT+RST");
+		break;
+	case 2:
+		Serial2.write("AT+RST");
+		break;
+	case 3:
+		Serial3.write("AT+RST");
+		break;
+	default:
+		break;
 	}
-	else
-	{
-		Serial.println("NO.1 STRUUID OK!");
-	}
-	clear_Serial_buffer(1);
-	delay(200);
-	memset(str_Serial, NULL, 50);
-	memcpy(str_Serial, "AT+MAJOR", 8);
-	strcat(str_Serial, Major);
-	Serial1.write(str_Serial, 12);
-	delay(20);
-	Serial1.readBytesUntil('\n', str_Serial, 10);
-	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
-	{
-		Serial.println("NO.1 Major ERROR!!!");
-		Serial.write(str_Serial);
-		Serial.println();
-		return 0;
-	}
-	else
-	{
-		Serial.println("NO.1 Major OK!");
-	}
-	clear_Serial_buffer(1);
-
-	delay(300);
-	memset(str_Serial, NULL, 50);
-	memcpy(str_Serial, "AT+MINOR", 8);
-	strcat(str_Serial, Minor);
-	Serial1.write(str_Serial,12);
-	delay(20);
-	Serial1.readBytesUntil('\n', str_Serial, 10);
-	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
-	{
-		Serial.println("NO.1 Minor ERROR!!!");
-		Serial.write(str_Serial);
-		Serial.println();
-		return 0;
-	}
-	else
-	{
-		Serial.print("NO.1 Minor is:");
-		Serial.write(Minor, 4);
-		Serial.println(" ");
-	}
-	clear_Serial_buffer(1);
-	return 1;
-}
-
-
-
-bool S2_Burn(uint16_t num)	//返回1为成功，0为失败
-{
-	clear_Serial_buffer(2);
-	char str_Serial[50];
-	memset(str_Serial, NULL, 50);
-	Serial2.write("AT+HOSTEN3");
-	delay(20);
-	Serial2.readBytesUntil('\n', str_Serial, 10);
-	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
-	{
-		Serial.println("NO.2 Mode ERROR!!!");
-		Serial.write(str_Serial);
-		Serial.println();
-		return 0;
-	}
-	else
-	{
-		Serial.println("NO.2 Mode OK!");
-	}
-	clear_Serial_buffer(2);
-	delay(100);
-	Serial1.write("AT+RST");
-	delay(200);	//经测试不能改小
-	clear_Serial_buffer(2);
-	memset(str_Serial, NULL, 50); 
-	memcpy(str_Serial, "AT+STRUUID", 10);
-	strcat(str_Serial, UUID);
-	Serial2.write(str_Serial, 42);
-	delay(20);
-	Serial2.readBytesUntil('\n', str_Serial, 10);
-	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
-	{
-		Serial.println("NO.2 STRUUID ERROR!!!");
-		Serial.write(str_Serial);
-		Serial.println();
-		return 0;
-	}
-	else
-	{
-		Serial.println("NO.2 STRUUID OK!");
-	}
-	clear_Serial_buffer(2);
-	delay(200);
-	memset(str_Serial, NULL, 50);
-	memcpy(str_Serial, "AT+MAJOR", 8);
-	strcat(str_Serial, Major);
-	Serial2.write(str_Serial, 12);
-	delay(20);
-	Serial2.readBytesUntil('\n', str_Serial, 10);
-	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
-	{
-		Serial.println("NO.2 Major ERROR!!!");
-		Serial.write(str_Serial);
-		Serial.println();
-		return 0;
-	}
-	else
-	{
-		Serial.println("NO.2 Major OK!");
-	}
-	clear_Serial_buffer(2);
-	delay(300);
-	memset(str_Serial, NULL, 50);
-	memcpy(str_Serial, "AT+MINOR", 8);
-	strcat(str_Serial, Minor);
-	Serial2.write(str_Serial, 12);
-	delay(20);
-	Serial2.readBytesUntil('\n', str_Serial, 10);
-	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
-	{
-		Serial.println("NO.2 Minor ERROR!!!");
-		Serial.write(str_Serial);
-		Serial.println();
-		return 0;
-	}
-	else
-	{
-		Serial.print("NO.2 Minor is:");
-		Serial.write(Minor, 4);
-		Serial.println(" ");
-	}
-	clear_Serial_buffer(2);
-	return 1;
-}
-
-bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
-{
-	clear_Serial_buffer(3);
-	char str_Serial[50];
-	memset(str_Serial, NULL, 50);
-	Serial3.write("AT+HOSTEN3");
-	delay(20);
-	Serial3.readBytesUntil('\n', str_Serial, 10);
-	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
-	{
-		Serial.println("NO.3 Mode ERROR!!!");
-		Serial.write(str_Serial);
-		Serial.println();
-		return 0;
-	}
-	else
-	{
-		Serial.println("NO.3 Mode OK!");
-	}
-	clear_Serial_buffer(3);
-	Serial1.write("AT+RST");
-	delay(200);	//经测试不能改小
-	clear_Serial_buffer(3);
+	//delay(250);	//经测试不能改小
+	clear_Serial_buffer(port);
+	/******** 配置UUID  ************/
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+STRUUID", 10);
 	strcat(str_Serial, UUID);
-	Serial3.write(str_Serial, 42);
-	delay(20);
-	Serial3.readBytesUntil('\n', str_Serial, 10);
+	switch (port)
+	{
+	case 1:
+		Serial1.write(str_Serial, 42);
+		delay(20);
+		Serial1.readBytesUntil('\n', str_Serial, 10);
+		break;
+	case 2:
+		Serial2.write(str_Serial, 42);
+		delay(20);
+		Serial2.readBytesUntil('\n', str_Serial, 10);
+		break;
+	case 3:
+		Serial3.write(str_Serial, 42);
+		delay(20);
+		Serial3.readBytesUntil('\n', str_Serial, 10);
+		break;
+	default:
+		break;
+	}
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
-		Serial.println("NO.3 STRUUID ERROR!!!");
+		Serial.print("NO.");
+		Serial.print(port);
+		Serial.println(" STRUUID ERROR!!!");
 		Serial.write(str_Serial);
-		Serial.println();
+		Serial.println(" ");
 		return 0;
 	}
 	else
 	{
-		Serial.println("NO.3 STRUUID OK!");
+		Serial.print("NO.");
+		Serial.print(port);
+		Serial.println(" STRUUID OK.");
 	}
-	clear_Serial_buffer(3);
-	delay(200);
+	clear_Serial_buffer(port);
+	//delay(200);
+
+	/******  配置Major  ********/
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+MAJOR", 8);
 	strcat(str_Serial, Major);
-	Serial3.write(str_Serial, 12);
-	delay(20);
-	Serial3.readBytesUntil('\n', str_Serial, 10);
+	switch (port)
+	{
+	case 1:
+		Serial1.write(str_Serial, 12);
+		delay(20);
+		Serial1.readBytesUntil('\n', str_Serial, 10);
+		break;
+	case 2:
+		Serial2.write(str_Serial, 12);
+		delay(20);
+		Serial2.readBytesUntil('\n', str_Serial, 10);
+		break;
+	case 3:
+		Serial3.write(str_Serial, 12);
+		delay(20);
+		Serial3.readBytesUntil('\n', str_Serial, 10);
+		break;
+	default:
+		break;
+	}
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
-		Serial.println("NO.3 Major ERROR!!!");
+		Serial.print("NO.");
+		Serial.print(port);
+		Serial.println(" Major ERROR!!!");
 		Serial.write(str_Serial);
 		Serial.println();
 		return 0;
 	}
 	else
 	{
-		Serial.println("NO.3 Major OK!");
+		Serial.print("NO.");
+		Serial.print(port);
+		Serial.println(" Major OK!");
 	}
-	clear_Serial_buffer(3);
-	delay(300);
+	clear_Serial_buffer(port);
+	//delay(300);
+
+	/***************  配置Minor  ******************/
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+MINOR", 8);
 	strcat(str_Serial, Minor);
-	Serial3.write(str_Serial, 12);
-	delay(20);
-	Serial3.readBytesUntil('\n', str_Serial, 10);
+	switch (port)
+	{
+	case 1:
+		Serial1.write(str_Serial, 12);
+		delay(20);
+		Serial1.readBytesUntil('\n', str_Serial, 10);
+		break;
+	case 2:
+		Serial2.write(str_Serial, 12);
+		delay(20);
+		Serial2.readBytesUntil('\n', str_Serial, 10);
+		break;
+	case 3:
+		Serial3.write(str_Serial, 12);
+		delay(20);
+		Serial3.readBytesUntil('\n', str_Serial, 10);
+		break;
+	default:
+		break;
+	}
+	
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
-		Serial.println("NO.3 Minor ERROR!!!");
+		Serial.print("NO.");
+		Serial.print(port);
+		Serial.println(" Minor ERROR!!!");
 		Serial.write(str_Serial);
 		Serial.println();
 		return 0;
 	}
 	else
 	{
-		Serial.print("NO.3 Minor is:");
+		Serial.print("NO.");
+		Serial.print(port);
+		Serial.print(" Minor is:");
 		Serial.write(Minor, 4);
-		Serial.println(" ");
+		Serial.println("(HEX) ");
+		Serial.print("DEC = ");
+		Serial.println(Minor_hex, DEC);
 	}
-	clear_Serial_buffer(3);
+	clear_Serial_buffer(port);
 	return 1;
 }
+
 
 /* 函数名：void clear_Serial_buffer(uint8_t port = 0)
  * 功能：清空串口的缓存区
@@ -724,17 +697,47 @@ bool S3_Burn(uint16_t num)	//返回1为成功，0为失败
 */
 void clear_Serial_buffer(uint8_t port = 0)
 {
-	delay(200);
+	char buffer[100];
+	int len;
+	delay(150);
 	switch (port)
 	{
 	case 0:
-		Serial.readString();
+		if (Serial.available())
+		{
+			delay(50);
+			len = Serial.available();
+			Serial.print("len = "); Serial.println(len);
+			Serial.readBytes(buffer, len);
+		}
+		break;
 	case 1:
-		Serial1.readString();
+		if (Serial1.available())
+		{
+			delay(50);
+			len = Serial1.available();
+			Serial.print("len = "); Serial.println(len);
+			Serial1.readBytes(buffer, len);
+		}
+		break;
 	case 2:
-		Serial2.readString();
+		if (Serial2.available())
+		{
+			delay(50);
+			len = Serial2.available();
+			Serial.print("len = "); Serial.println(len);
+			Serial2.readBytes(buffer, len);
+		}
+		break;
 	case 3:
-		Serial3.readString();
+		if (Serial3.available())
+		{
+			delay(50);
+			len = Serial3.available();
+			Serial.print("len = "); Serial.println(len);
+			Serial3.readBytes(buffer, len);
+		}
+		break;
 	default:
 		break;
 	}
