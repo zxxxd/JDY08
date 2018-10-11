@@ -565,32 +565,39 @@ int burn_AT_cmd(uint8_t port)
 	default:
 		break;
 	}
-	//delay(250);	//经测试不能改小
+	delay(250);	//经测试不能改小
 	clear_Serial_buffer(port);
 	/******** 配置UUID  ************/
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+STRUUID", 10);
 	strcat(str_Serial, UUID);
+	Serial.print("UUID : ");
+	Serial.println(str_Serial);
 	switch (port)
 	{
 	case 1:
 		Serial1.write(str_Serial, 42);
 		delay(20);
+		memset(str_Serial, NULL, 50);
 		Serial1.readBytesUntil('\n', str_Serial, 10);
 		break;
 	case 2:
 		Serial2.write(str_Serial, 42);
 		delay(20);
+		memset(str_Serial, NULL, 50);
 		Serial2.readBytesUntil('\n', str_Serial, 10);
 		break;
 	case 3:
 		Serial3.write(str_Serial, 42);
 		delay(20);
+		memset(str_Serial, NULL, 50);
 		Serial3.readBytesUntil('\n', str_Serial, 10);
 		break;
 	default:
 		break;
 	}
+	Serial.print("get : ");
+	Serial.println(str_Serial);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
 		Serial.print("NO.");
@@ -609,7 +616,7 @@ int burn_AT_cmd(uint8_t port)
 		case 1:
 			Serial1.write("AT+STRUUID");
 			delay(40);
-			Serial1.readBytesUntil('\n', str_check, 38);
+			Serial1.readBytesUntil('\n', str_check, 39);
 			break;
 		case 2:
 			Serial2.write("AT+STRUUID");
@@ -624,7 +631,7 @@ int burn_AT_cmd(uint8_t port)
 		default:
 			break;
 		}
-		if (strcmp((str_Serial + 10), (str_check + 6)))	//比较参数。相同就返回0.
+		if (strcmp(UUID, (str_check + 6)))	//比较参数。相同就返回0.
 		{
 			Serial.print("NO.");
 			Serial.print(port);
@@ -636,7 +643,6 @@ int burn_AT_cmd(uint8_t port)
 			/*Serial.print("NO.");
 			Serial.print(port);
 			Serial.println(" STRUUID OK.");*/
-			return 1;
 		}
 	}
 	clear_Serial_buffer(port);
@@ -652,16 +658,19 @@ int burn_AT_cmd(uint8_t port)
 	case 1:
 		Serial1.write(str_Serial, 12);
 		delay(20);
+		memset(str_Serial, NULL, 50);
 		Serial1.readBytesUntil('\n', str_Serial, 10);
 		break;
 	case 2:
 		Serial2.write(str_Serial, 12);
 		delay(20);
+		memset(str_Serial, NULL, 50);
 		Serial2.readBytesUntil('\n', str_Serial, 10);
 		break;
 	case 3:
 		Serial3.write(str_Serial, 12);
 		delay(20);
+		memset(str_Serial, NULL, 50);
 		Serial3.readBytesUntil('\n', str_Serial, 10);
 		break;
 	default:
@@ -700,7 +709,9 @@ int burn_AT_cmd(uint8_t port)
 		default:
 			break;
 		}
-		if (strcmp((str_Serial + 8), (str_check + 7)))
+		Serial.print("check : ");
+		Serial.println(str_check);
+		if (strcmp(Major, (str_check + 7)))
 		{
 			Serial.print("NO.");
 			Serial.print(port);
@@ -721,21 +732,27 @@ int burn_AT_cmd(uint8_t port)
 	memset(str_check, NULL, 50);
 	memcpy(str_Serial, "AT+MINOR", 8);
 	strcat(str_Serial, Minor);
+
+	Serial.print("Minor : ");
+	Serial.println(str_Serial);
 	switch (port)
 	{
 	case 1:
 		Serial1.write(str_Serial, 12);
 		delay(20);
+		memset(str_Serial, NULL, 50);
 		Serial1.readBytesUntil('\n', str_Serial, 10);
 		break;
 	case 2:
 		Serial2.write(str_Serial, 12);
 		delay(20);
+		memset(str_Serial, NULL, 50);
 		Serial2.readBytesUntil('\n', str_Serial, 10);
 		break;
 	case 3:
 		Serial3.write(str_Serial, 12);
 		delay(20);
+		memset(str_Serial, NULL, 50);
 		Serial3.readBytesUntil('\n', str_Serial, 10);
 		break;
 	default:
@@ -775,7 +792,9 @@ int burn_AT_cmd(uint8_t port)
 		default:
 			break;
 		}
-		if (strcmp((str_Serial + 8), (str_check + 7)))	
+		Serial.print("check : ");
+		Serial.println(str_check);
+		if (strcmp(Minor, (str_check + 7)))	
 		{
 			Serial.print("NO.");
 			Serial.print(port);
@@ -783,18 +802,16 @@ int burn_AT_cmd(uint8_t port)
 		}
 		else
 		{
-			/*Serial.print("NO.");
+			Serial.print("NO.");
 			Serial.print(port);
-			Serial.println(" MINOR OK.");*/
+			Serial.print(" Minor is:");
+			Serial.println(Minor_hex, DEC);
+			clear_Serial_buffer(port);
+			return 1;
 		}
-		memset(str_check, NULL, 50);
-		Serial.print("NO.");
-		Serial.print(port);
-		Serial.print(" Minor is:");
-		Serial.println(Minor_hex, DEC);
 	}
 	clear_Serial_buffer(port);
-	return 1;
+	return 0;
 }
 
 
