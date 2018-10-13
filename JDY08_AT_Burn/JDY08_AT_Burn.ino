@@ -28,9 +28,9 @@
 #define FIRST_USE 0
 char UUID[33] = "FDA50693A4E24FB1AFCFC6EB07647825";		//必须为字符串，十六进制
 uint16_t Major_hex = 10190;									//十进制
-uint16_t Minor_hex = 41;									//十进制
-uint32_t SYS_ID = 21587852;		//系统ID, 十进制
-uint32_t Dev_Code = 49;			//设备编号，十进制
+uint16_t Minor_hex = 114;									//十进制
+uint32_t SYS_ID = 21587925;		//系统ID, 十进制
+uint32_t Dev_Code = 122;			//设备编号，十进制
 char Major[5];					//字符串，代表uint16_t的十六进制
 char Minor[5];
 
@@ -167,6 +167,14 @@ void setup()
 		Serial.print("New Minor is: ");
 		Serial.println(Minor_hex, DEC);
 		memset(string_read, NULL, 10);
+		SYS_ID = Minor_hex + 21587811;
+		Dev_Code = Minor_hex + 8;
+		Serial.print("SYS_ID(DEC) = ");
+		Serial.print(SYS_ID, DEC);
+		Serial.println();
+		Serial.print("Dev_Code(DEC) = ");
+		Serial.print(Dev_Code, DEC);
+		Serial.println();
 	}
 	else
 	{
@@ -310,7 +318,9 @@ void loop()
 	}
 
 	if (Serial1.available()) {     // If anything comes in Serial1 (pins 0 & 1)
-		Serial.write(Serial1.read());   // read it and send it out Serial (USB)
+		int x = Serial1.read();
+		if (x != 0)
+			Serial.write(Serial1.read());   // read it and send it out Serial (USB)
 	}
 }
 
@@ -571,8 +581,6 @@ int burn_AT_cmd(uint8_t port)
 	memset(str_Serial, NULL, 50);
 	memcpy(str_Serial, "AT+STRUUID", 10);
 	strcat(str_Serial, UUID);
-	Serial.print("UUID : ");
-	Serial.println(str_Serial);
 	switch (port)
 	{
 	case 1:
@@ -596,8 +604,6 @@ int burn_AT_cmd(uint8_t port)
 	default:
 		break;
 	}
-	Serial.print("get : ");
-	Serial.println(str_Serial);
 	if (str_Serial[1] != 'O' && str_Serial[2] != 'K')
 	{
 		Serial.print("NO.");
@@ -709,8 +715,6 @@ int burn_AT_cmd(uint8_t port)
 		default:
 			break;
 		}
-		Serial.print("check : ");
-		Serial.println(str_check);
 		if (strcmp(Major, (str_check + 7)))
 		{
 			Serial.print("NO.");
@@ -732,9 +736,6 @@ int burn_AT_cmd(uint8_t port)
 	memset(str_check, NULL, 50);
 	memcpy(str_Serial, "AT+MINOR", 8);
 	strcat(str_Serial, Minor);
-
-	Serial.print("Minor : ");
-	Serial.println(str_Serial);
 	switch (port)
 	{
 	case 1:
@@ -792,8 +793,6 @@ int burn_AT_cmd(uint8_t port)
 		default:
 			break;
 		}
-		Serial.print("check : ");
-		Serial.println(str_check);
 		if (strcmp(Minor, (str_check + 7)))	
 		{
 			Serial.print("NO.");
@@ -802,10 +801,10 @@ int burn_AT_cmd(uint8_t port)
 		}
 		else
 		{
-			Serial.print("NO.");
-			Serial.print(port);
-			Serial.print(" Minor is:");
-			Serial.println(Minor_hex, DEC);
+			//Serial.print("NO.");
+			//Serial.print(port);
+			//Serial.print(" Minor is:");
+			//Serial.println(Minor_hex, DEC);
 			clear_Serial_buffer(port);
 			return 1;
 		}
